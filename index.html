@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Excel Data Combine Tool</title>
+
+  <!-- SheetJS Excel Library -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f4f7;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: white;
+      padding: 22px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px #bbb;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #174a7e;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      min-width: 220px;
+    }
+
+    label {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    input,
+    select {
+      padding: 10px;
+      font-size: 15px;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 11px 18px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+      margin: 5px 5px 5px 0;
+    }
+
+    #processBtn {
+      background: #16803c;
+    }
+
+    #downloadBtn {
+      background: #1769aa;
+    }
+
+    #clearBtn {
+      background: #c62828;
+    }
+
+    button:disabled {
+      background: #999 !important;
+      cursor: not-allowed;
+    }
+
+    #fileInfo,
+    #status {
+      margin: 12px 0;
+      font-weight: bold;
+    }
+
+    #status {
+      color: #1769aa;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 20px;
+      border: 1px solid #ccc;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1000px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 7px;
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    th {
+      background: #dcecff;
+    }
+
+    .note {
+      background: #fff8dc;
+      border-left: 4px solid #e4ad00;
+      padding: 10px;
+      margin: 12px 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>Excel Data Combine અને Month Filter Tool</h2>
+
+    <div class="note">
+      દરેક Excel fileમાં Row 4 header હોવો જોઈએ. એટલે પ્રથમ 3 rows skip થશે.
+      વધુમાં વધુ 8 Excel files upload કરી શકાય.
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="excelFiles">Excel Files Upload કરો</label>
+        <input
+          type="file"
+          id="excelFiles"
+          accept=".xlsx,.xls"
+          multiple
+        >
+      </div>
+
+      <div class="field">
+        <label for="talukaSelect">તાલુકો પસંદ કરો</label>
+        <select id="talukaSelect">
+          <option value="">-- તાલુકો પસંદ કરો --</option>
+          <option value="Jamnagar">Jamnagar</option>
+          <option value="Kalavad">Kalavad</option>
+          <option value="Dhrol">Dhrol</option>
+          <option value="Jodiya">Jodiya</option>
+          <option value="Lalpur">Lalpur</option>
+          <option value="Kalyanpur">Kalyanpur</option>
+          <option value="Bhanvad">Bhanvad</option>
+          <option value="Dwarka">Dwarka</option>
+          <option value="Khambhalia">Khambhalia</option>
+          <option value="Salaya">Salaya</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="monthSelect">Voucher Date નો મહિનો</label>
+        <select id="monthSelect">
+          <option value="">-- મહિનો પસંદ કરો --</option>
+          <option value="01">01 - January</option>
+          <option value="02">02 - February</option>
+          <option value="03">03 - March</option>
+          <option value="04">04 - April</option>
+          <option value="05">05 - May</option>
+          <option value="06">06 - June</option>
+          <option value="07">07 - July</option>
+          <option value="08">08 - August</option>
+          <option value="09">09 - September</option>
+          <option value="10">10 - October</option>
+          <option value="11">11 - November</option>
+          <option value="12">12 - December</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="fileInfo">કોઈ ફાઇલ પસંદ કરેલ નથી.</div>
+
+    <button id="processBtn" disabled>
+      Process / Combine કરો
+    </button>
+
+    <button id="downloadBtn" disabled>
+      Filtered Excel Download કરો
+    </button>
+
+    <button id="clearBtn">
+      Clear કરો
+    </button>
+
+    <div id="status"></div>
+
+    <div class="table-wrapper">
+      <table id="resultTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const excelFiles = document.getElementById("excelFiles");
+    const talukaSelect = document.getElementById("talukaSelect");
+    const monthSelect = document.getElementById("monthSelect");
+    const processBtn = document.getElementById("processBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const fileInfo = document.getElementById("fileInfo");
+    const statusBox = document.getElementById("status");
+
+    const resultTable = document.getElementById("resultTable");
+    const tableHead = resultTable.querySelector("thead");
+    const tableBody = resultTable.querySelector("tbody");
+
+    let finalData = [];
+    let selectedFiles = [];
+
+    excelFiles.addEventListener("change", function () {
+      selectedFiles = Array.from(excelFiles.files);
+
+      if (selectedFiles.length > 8) {
+        alert("વધુમાં વધુ 8 Excel files જ upload કરી શકાય છે.");
+        excelFiles.value = "";
+        selectedFiles = [];
+        processBtn.disabled = true;
+        fileInfo.innerText = "કોઈ ફાઇલ પસંદ કરેલ નથી.";
+        return;
+      }
+
+      if (selectedFiles.length === 0) {
+        processBtn.disabled = true;
+        fileInfo.innerText = "કોઈ ફાઇલ પસંદ કરેલ નથી.";
+        return;
+      }
+
+      fileInfo.innerText =
+        selectedFiles.length + " Excel file(s) પસંદ કરેલ છે.";
+
+      processBtn.disabled = false;
+    });
+
+    processBtn.addEventListener("click", async function () {
+      if (selectedFiles.length === 0) {
+        alert("પહેલા Excel file upload કરો.");
+        return;
+      }
+
+      if (talukaSelect.value === "") {
+        alert("કૃપા કરીને તાલુકો પસંદ કરો.");
+        return;
+      }
+
+      if (monthSelect.value === "") {
+        alert("કૃપા કરીને મહિનો પસંદ કરો.");
+        return;
+      }
+
+      processBtn.disabled = true;
+      downloadBtn.disabled = true;
+      statusBox.innerText = "Excel files process થઈ રહી છે...";
+
+      try {
+        const allRows = [];
+
+        for (let i = 0; i < selectedFiles.length; i++) {
+          statusBox.innerText =
+            `File ${i + 1} / ${selectedFiles.length} વાંચી રહ્યા છીએ...`;
+
+          const file = selectedFiles[i];
+          const arrayBuffer = await file.arrayBuffer();
+
+          const workbook = XLSX.read(arrayBuffer, {
+            type: "array",
+            cellDates: true
+          });
+
+          /*
+            દરેક uploaded Excel fileની પ્રથમ sheet લેવામાં આવે છે.
+            જો એક fileમાં ઘણી sheets હોય અને બધી sheets લેવી હોય,
+            તો નીચેનો code ઉપયોગ કરી શકાય:
+            
+            workbook.SheetNames.forEach(sheetName => { ... });
+          */
+
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+
+          // Row 4 header છે એટલે range: 3
+          const rows = XLSX.utils.sheet_to_json(worksheet, {
+            range: 3,
+            defval: "",
+            raw: false
+          });
+
+          rows.forEach(row => {
+            allRows.push(row);
+          });
+        }
+
+        const taluka = talukaSelect.value;
+        const selectedMonth = monthSelect.value;
+
+        const outputRows = [];
+
+        allRows.forEach(row => {
+          const voucherDate = getColumnValue(row, [
+            "Voucher Date",
+            "Voucher date",
+            "VoucherDate"
+          ]);
+
+          const voucherMonth = getMonthFromDDMMYYYY(voucherDate);
+
+          if (voucherMonth === selectedMonth) {
+            const outputRow = {
+              "Sr No": getColumnValue(row, ["Sr No", "SrNo"]),
+              "District Name": getColumnValue(row, ["District Name"]),
+              "Voucher No/Token No": getColumnValue(row, [
+                "Voucher No/Token No",
+                "Voucher No",
+                "Token No"
+              ]),
+              "Voucher Date": voucherDate,
+              "Budget Type": getColumnValue(row, ["Budget Type"]),
+              "Gross Amount": getColumnValue(row, ["Gross Amount"]),
+              "Recovery Amount": getColumnValue(row, [
+                "Recovery Amount"
+              ]),
+              "Deduction Amount": getColumnValue(row, [
+                "Deduction Amount"
+              ]),
+              "Net Amount": getColumnValue(row, ["Net Amount"]),
+
+              // Column J
+              "Taluka": taluka
+            };
+
+            outputRows.push(outputRow);
+          }
+        });
+
+        finalData = outputRows;
+        displayTable(finalData);
+
+        statusBox.innerText =
+          `${finalData.length} matching row(s) મળ્યા.`;
+
+        downloadBtn.disabled = finalData.length === 0;
+      } catch (error) {
+        console.error(error);
+        statusBox.innerText =
+          "Excel process કરતી વખતે ભૂલ આવી.";
+      }
+
+      processBtn.disabled = false;
+    });
+
+    function getColumnValue(row, possibleNames) {
+      for (const name of possibleNames) {
+        if (Object.prototype.hasOwnProperty.call(row, name)) {
+          return row[name];
+        }
+      }
+
+      // Headerમાં extra spaces હોય તો શોધ
+      const rowKeys = Object.keys(row);
+
+      for (const key of rowKeys) {
+        const cleanKey = key.trim().toLowerCase();
+
+        for (const name of possibleNames) {
+          if (cleanKey === name.trim().toLowerCase()) {
+            return row[key];
+          }
+        }
+      }
+
+      return "";
+    }
+
+    function getMonthFromDDMMYYYY(value) {
+      if (value === null || value === undefined) {
+        return "";
+      }
+
+      let dateText = String(value).trim();
+
+      /*
+        Excel date ક્યારેક dd/mm/yyyy,
+        dd-mm-yyyy અથવા સીધું ddmmyyyy હોઈ શકે છે.
+      */
+
+      // માત્ર આંકડા હોય તો ddmmyyyy
+      const onlyNumbers = dateText.replace(/\D/g, "");
+
+      if (onlyNumbers.length === 8) {
+        // ddmmyyyy: પ્રથમ 2 day, વચ્ચેના 2 month
+        return onlyNumbers.substring(2, 4);
+      }
+
+      // dd/mm/yyyy અથવા dd-mm-yyyy
+      const match = dateText.match(/^(\d{1,2})\D(\d{1,2})\D(\d{4})$/);
+
+      if (match) {
+        return match[2].padStart(2, "0");
+      }
+
+      return "";
+    }
+
+    function displayTable(data) {
+      tableHead.innerHTML = "";
+      tableBody.innerHTML = "";
+
+      if (data.length === 0) {
+        tableBody.innerHTML =
+          `<tr><td>પસંદ કરેલા મહિના માટે કોઈ data મળ્યો નથી.</td></tr>`;
+        return;
+      }
+
+      const headers = Object.keys(data[0]);
+
+      const headerRow = document.createElement("tr");
+
+      headers.forEach(header => {
+        const th = document.createElement("th");
+        th.innerText = header;
+        headerRow.appendChild(th);
+      });
+
+      tableHead.appendChild(headerRow);
+
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+
+        headers.forEach(header => {
+          const td = document.createElement("td");
+          td.innerText = row[header] ?? "";
+          tr.appendChild(td);
+        });
+
+        tableBody.appendChild(tr);
+      });
+    }
+
+    downloadBtn.addEventListener("click", function () {
+      if (finalData.length === 0) {
+        alert("Download કરવા માટે કોઈ data નથી.");
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(finalData);
+      const workbook = XLSX.utils.book_new();
+
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Filtered Data"
+      );
+
+      XLSX.writeFile(workbook, "combined-filtered-data.xlsx");
+    });
+
+    clearBtn.addEventListener("click", function () {
+      selectedFiles = [];
+      finalData = [];
+
+      excelFiles.value = "";
+      talukaSelect.value = "";
+      monthSelect.value = "";
+
+      fileInfo.innerText = "કોઈ ફાઇલ પસંદ કરેલ નથી.";
+      statusBox.innerText = "";
+      tableHead.innerHTML = "";
+      tableBody.innerHTML = "";
+
+      processBtn.disabled = true;
+      downloadBtn.disabled = true;
+    });
+  </script>
+
+</body>
+</html>
